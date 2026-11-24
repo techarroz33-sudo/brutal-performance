@@ -1,0 +1,6 @@
+{
+  "name": "ApexFit — Condicionamento Físico & Telemetria",
+  "description": "Plataforma de condicionamento físico com análise biométrica ao logar, geração de tabela de exercícios por objetivo e tabela de alimentos recomendados por perfil.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
