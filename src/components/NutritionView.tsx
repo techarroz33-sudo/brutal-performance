@@ -1,13 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Apple,
+  Calendar,
   Check,
+  Database,
   Droplets,
+  Minus,
+  Pencil,
   Plus,
+  RotateCcw,
   Trash2,
   Utensils,
+  X,
 } from 'lucide-react';
 import {
   AppTab,
@@ -21,29 +27,45 @@ import { GOAL_LABELS } from '../utils/fitnessEngine';
 interface NutritionViewProps {
   profile: UserProfile;
   analysis: BiometricAnalysis;
+  activeDateLabel: string;
   meals: PlannedMeal[];
   onToggleMeal: (mealId: string) => void;
   onAddCustomMeal: (meal: Omit<PlannedMeal, 'id' | 'order'>) => void;
+  onUpdateMeal: (meal: PlannedMeal) => void;
   onRemoveMeal: (mealId: string) => void;
+  onRestoreDefaultMeals: () => void;
   waterMl: number;
   onAddWater: (amountMl: number) => void;
+  onSetWater: (exactMl: number) => void;
   supplements: DailySupplement[];
   onToggleSupplement: (supplementId: string) => void;
+  onAddSupplement: (name: string, dose: string) => void;
+  onRemoveSupplement: (supplementId: string) => void;
+  onResetTodayDiary: () => void;
   onNavigateTab: (tab: AppTab) => void;
+  onOpenDataControl: () => void;
 }
 
 export const NutritionView: React.FC<NutritionViewProps> = ({
   profile,
   analysis,
+  activeDateLabel,
   meals,
   onToggleMeal,
   onAddCustomMeal,
+  onUpdateMeal,
   onRemoveMeal,
+  onRestoreDefaultMeals,
   waterMl,
   onAddWater,
+  onSetWater,
   supplements,
   onToggleSupplement,
+  onAddSupplement,
+  onRemoveSupplement,
+  onResetTodayDiary,
   onNavigateTab,
+  onOpenDataControl,
 }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [title, setTitle] = useState('');
@@ -52,6 +74,20 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
   const [proteinG, setProteinG] = useState(28);
   const [carbsG, setCarbsG] = useState(32);
   const [fatG, setFatG] = useState(8);
+  const [fiberG, setFiberG] = useState(4);
+
+  const [editingMealId, setEditingMealId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<PlannedMeal | null>(null);
+
+  const [customWaterInput, setCustomWaterInput] = useState<string>(String(waterMl));
+  const [showAddSupForm, setShowAddSupForm] = useState(false);
+  const [supName, setSupName] = useState('');
+  const [supDose, setSupDose] = useState('');
+  const [confirmResetToday, setConfirmResetToday] = useState(false);
+
+  useEffect(() => {
+    setCustomWaterInput(String(waterMl));
+  }, [waterMl]);
 
   const consumedKcal = meals
     .filter((m) => m.confirmed)
@@ -94,7 +130,7 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
       proteinG: Math.max(0, proteinG),
       carbsG: Math.max(0, carbsG),
       fatG: Math.max(0, fatG),
-      fiberG: 4,
+      fiberG: Math.max(0, fiberG),
       tag: 'Registro Manual',
       confirmed: true,
     });
@@ -102,28 +138,115 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
     setShowAddForm(false);
   };
 
+  const handleStartEditMeal = (meal: PlannedMeal) => {
+    setEditingMealId(meal.id);
+    setEditDraft({ ...meal });
+  };
+
+  const handleSaveEditMeal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editDraft || !editDraft.title.trim()) return;
+    onUpdateMeal({
+      ...editDraft,
+      title: editDraft.title.trim(),
+      kcal: Math.max(0, editDraft.kcal),
+      proteinG: Math.max(0, editDraft.proteinG),
+      carbsG: Math.max(0, editDraft.carbsG),
+      fatG: Math.max(0, editDraft.fatG),
+      fiberG: Math.max(0, editDraft.fiberG),
+    });
+    setEditingMealId(null);
+    setEditDraft(null);
+  };
+
+  const handleApplyCustomWater = (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = Math.max(0, Math.min(15000, Math.round(Number(customWaterInput) || 0)));
+    onSetWater(parsed);
+  };
+
+  const handleCreateSupplement = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supName.trim()) return;
+    onAddSupplement(supName.trim(), supDose.trim() || 'Diário');
+    setSupName('');
+    setSupDose('');
+    setShowAddSupForm(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="text-xs text-[#A3E635] font-semibold uppercase tracking-wider">
-            Protocolo {GOAL_LABELS[profile.goal]}
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+            <span className="text-[#A3E635] uppercase tracking-wider">
+              Protocolo {GOAL_LABELS[profile.goal]}
+            </span>
+            <span className="text-[#6B7871]">·</span>
+            <span className="inline-flex items-center gap-1 text-[#14B8A6]">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Hoje ({activeDateLabel}) · Zera automaticamente todo dia</span>
+            </span>
           </div>
           <h2 className="font-display text-2xl font-bold text-white">
-            Diário Nutricional &amp; Metas de Macro
+            Diário Nutricional &amp; Controle Diário
           </h2>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => onNavigateTab('foods')}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#18201C] hover:bg-[#1F2A24] border border-white/10 text-xs font-semibold text-white whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#18201C] hover:bg-[#1F2A24] border border-white/10 text-xs font-semibold text-white whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Apple className="w-4 h-4 text-[#A3E635]" />
-            <span>Tabela de Alimentos por Perfil</span>
+            <span>Alimentos</span>
           </button>
+
+          <button
+            type="button"
+            onClick={onOpenDataControl}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#18201C] hover:bg-[#1F2A24] border border-white/10 text-xs font-semibold text-[#C8D3CD] hover:text-white whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Database className="w-3.5 h-3.5 text-[#A3E635]" />
+            <span>Controlar Meus Dados</span>
+          </button>
+
+          {confirmResetToday ? (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/35">
+              <span className="text-[11px] font-semibold text-amber-200">
+                Zerar hoje?
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  onResetTodayDiary();
+                  setConfirmResetToday(false);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-[#A3E635] text-[#0A0F0D] text-[11px] font-bold cursor-pointer"
+              >
+                Sim
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmResetToday(false)}
+                className="px-2 py-1 rounded-lg bg-[#141B17] text-[#C8D3CD] text-[11px] cursor-pointer"
+              >
+                Não
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmResetToday(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#18201C] hover:bg-[#1F2A24] border border-white/10 text-xs font-semibold text-[#FCA5A5] whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Zerar Hoje</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setShowAddForm((v) => !v)}
@@ -139,7 +262,7 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
       {showAddForm && (
         <form
           onSubmit={handleCreateMeal}
-          className="apex-card p-5 grid grid-cols-1 sm:grid-cols-6 gap-3 items-end"
+          className="apex-card p-5 grid grid-cols-1 sm:grid-cols-7 gap-3 items-end"
         >
           <label className="sm:col-span-2 block space-y-1">
             <span className="text-xs text-[#9CA9A2]">Nome da refeição</span>
@@ -171,7 +294,7 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
               className="w-full h-9 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono tabular-nums focus:outline-none focus:border-[#A3E635]"
             />
           </label>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="sm:col-span-2 grid grid-cols-4 gap-1.5">
             <label className="block space-y-1">
               <span className="text-[10px] text-[#A3E635]">Prot(g)</span>
               <input
@@ -199,6 +322,16 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
                 min={0}
                 value={fatG}
                 onChange={(e) => setFatG(Number(e.target.value) || 0)}
+                className="w-full h-9 px-2 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono tabular-nums"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-[10px] text-[#C8D3CD]">Fib(g)</span>
+              <input
+                type="number"
+                min={0}
+                value={fiberG}
+                onChange={(e) => setFiberG(Number(e.target.value) || 0)}
                 className="w-full h-9 px-2 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono tabular-nums"
               />
             </label>
@@ -377,92 +510,264 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
       {/* Planned Meals & Right Hydration/Supplements */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <div className="lg:col-span-8 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Utensils className="w-4 h-4 text-[#A3E635]" />
               <h3 className="font-display text-lg font-bold text-white">
-                Refeições Planejadas &amp; Consumo
+                Refeições do Dia &amp; Consumo
               </h3>
             </div>
-            <span className="text-xs text-[#8C9992] tabular-nums">
-              {meals.filter((m) => m.confirmed).length} concluídas ·{' '}
-              {meals.filter((m) => !m.confirmed).length} pendentes
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {meals.map((meal) => (
-              <div
-                key={meal.id}
-                className={`apex-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
-                  meal.confirmed ? 'border-[#22C55E]/25' : ''
-                }`}
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-[#8C9992] tabular-nums">
+                {meals.filter((m) => m.confirmed).length} concluídas ·{' '}
+                {meals.filter((m) => !m.confirmed).length} pendentes
+              </span>
+              <button
+                type="button"
+                onClick={onRestoreDefaultMeals}
+                className="text-[#14B8A6] font-medium hover:underline cursor-pointer"
               >
-                <div className="flex items-start gap-4 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-[#18201C] border border-white/8 flex items-center justify-center font-mono text-xs font-bold text-[#A3E635] shrink-0">
-                    {meal.order}
-                  </div>
-                  <div className="space-y-1.5 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="font-display text-base font-bold text-white">
-                        {meal.title}
-                      </h4>
-                      <span className="text-xs font-mono text-[#22C55E] tabular-nums">
-                        {meal.time}
-                      </span>
-                      <span className="text-[11px] text-[#8C9992]">· {meal.tag}</span>
-                    </div>
-                    <p className="text-xs text-[#9CA9A2] leading-relaxed">
-                      {meal.description}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-4 pt-1 text-xs font-mono tabular-nums">
-                      <span className="text-[#A3E635]">PROT {meal.proteinG}g</span>
-                      <span className="text-[#14B8A6]">CARB {meal.carbsG}g</span>
-                      <span className="text-[#FB923C]">GORD {meal.fatG}g</span>
-                      <span className="text-[#C8D3CD]">FIB {meal.fiberG}g</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
-                  <div className="text-right">
-                    <div className="font-display text-xl font-extrabold text-white tabular-nums">
-                      {meal.kcal}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-wider text-[#8C9992]">
-                      Kcal
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onToggleMeal(meal.id)}
-                      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                        meal.confirmed
-                          ? 'bg-[#17261E] border border-[#22C55E]/40 text-[#22C55E]'
-                          : 'bg-[#A3E635] hover:bg-[#B4F72E] text-[#0A0F0D]'
-                      }`}
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>{meal.confirmed ? 'Confirmada' : 'Confirmar Consumo'}</span>
-                    </button>
-
-                    {meal.id.startsWith('custom-') && (
-                      <button
-                        type="button"
-                        onClick={() => onRemoveMeal(meal.id)}
-                        aria-label="Remover refeição"
-                        className="p-2 rounded-lg bg-[#18201C] text-[#9CA9A2] hover:text-red-400 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+                Restaurar sugestões
+              </button>
+            </div>
           </div>
+
+          {meals.length === 0 ? (
+            <div className="apex-card p-8 text-center space-y-3">
+              <p className="text-sm text-[#9CA9A2]">
+                Nenhuma refeição na lista de hoje. Adicione manualmente ou restaure as sugestões do seu objetivo.
+              </p>
+              <button
+                type="button"
+                onClick={onRestoreDefaultMeals}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#A3E635] text-[#0A0F0D] text-xs font-bold cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restaurar Refeições Sugeridas</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {meals.map((meal) => {
+                const isEditing = editingMealId === meal.id && editDraft;
+
+                if (isEditing && editDraft) {
+                  return (
+                    <form
+                      key={meal.id}
+                      onSubmit={handleSaveEditMeal}
+                      className="apex-card p-5 border-[#A3E635]/40 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#A3E635]">
+                          Editando Refeição {meal.order}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingMealId(null);
+                            setEditDraft(null);
+                          }}
+                          className="p-1 text-[#8C9992] hover:text-white cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-6 gap-2.5">
+                        <label className="sm:col-span-4 block space-y-1">
+                          <span className="text-[11px] text-[#9CA9A2]">Título</span>
+                          <input
+                            type="text"
+                            required
+                            value={editDraft.title}
+                            onChange={(e) =>
+                              setEditDraft({ ...editDraft, title: e.target.value })
+                            }
+                            className="w-full h-9 px-3 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white"
+                          />
+                        </label>
+                        <label className="sm:col-span-2 block space-y-1">
+                          <span className="text-[11px] text-[#9CA9A2]">Horário</span>
+                          <input
+                            type="time"
+                            value={editDraft.time}
+                            onChange={(e) =>
+                              setEditDraft({ ...editDraft, time: e.target.value })
+                            }
+                            className="w-full h-9 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <label className="block space-y-1">
+                          <span className="text-[10px] text-[#9CA9A2]">Kcal</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editDraft.kcal}
+                            onChange={(e) =>
+                              setEditDraft({ ...editDraft, kcal: Number(e.target.value) || 0 })
+                            }
+                            className="w-full h-8 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono"
+                          />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="text-[10px] text-[#A3E635]">Prot (g)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editDraft.proteinG}
+                            onChange={(e) =>
+                              setEditDraft({ ...editDraft, proteinG: Number(e.target.value) || 0 })
+                            }
+                            className="w-full h-8 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono"
+                          />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="text-[10px] text-[#14B8A6]">Carb (g)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editDraft.carbsG}
+                            onChange={(e) =>
+                              setEditDraft({ ...editDraft, carbsG: Number(e.target.value) || 0 })
+                            }
+                            className="w-full h-8 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono"
+                          />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="text-[10px] text-[#FB923C]">Gord (g)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editDraft.fatG}
+                            onChange={(e) =>
+                              setEditDraft({ ...editDraft, fatG: Number(e.target.value) || 0 })
+                            }
+                            className="w-full h-8 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono"
+                          />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="text-[10px] text-[#C8D3CD]">Fibras (g)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editDraft.fiberG}
+                            onChange={(e) =>
+                              setEditDraft({ ...editDraft, fiberG: Number(e.target.value) || 0 })
+                            }
+                            className="w-full h-8 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingMealId(null);
+                            setEditDraft(null);
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-[#18201C] text-xs text-[#C8D3CD] cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-1.5 rounded-lg bg-[#A3E635] text-[#0A0F0D] text-xs font-bold cursor-pointer"
+                        >
+                          Salvar Alterações
+                        </button>
+                      </div>
+                    </form>
+                  );
+                }
+
+                return (
+                  <div
+                    key={meal.id}
+                    className={`apex-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
+                      meal.confirmed ? 'border-[#22C55E]/25' : ''
+                    }`}
+                  >
+                    <div className="flex items-start gap-4 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-[#18201C] border border-white/8 flex items-center justify-center font-mono text-xs font-bold text-[#A3E635] shrink-0">
+                        {meal.order}
+                      </div>
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-display text-base font-bold text-white">
+                            {meal.title}
+                          </h4>
+                          <span className="text-xs font-mono text-[#22C55E] tabular-nums">
+                            {meal.time}
+                          </span>
+                          <span className="text-[11px] text-[#8C9992]">· {meal.tag}</span>
+                        </div>
+                        <p className="text-xs text-[#9CA9A2] leading-relaxed">
+                          {meal.description}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-4 pt-1 text-xs font-mono tabular-nums">
+                          <span className="text-[#A3E635]">PROT {meal.proteinG}g</span>
+                          <span className="text-[#14B8A6]">CARB {meal.carbsG}g</span>
+                          <span className="text-[#FB923C]">GORD {meal.fatG}g</span>
+                          <span className="text-[#C8D3CD]">FIB {meal.fiberG}g</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
+                      <div className="text-right">
+                        <div className="font-display text-xl font-extrabold text-white tabular-nums">
+                          {meal.kcal}
+                        </div>
+                        <div className="text-[10px] uppercase tracking-wider text-[#8C9992]">
+                          Kcal
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onToggleMeal(meal.id)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                            meal.confirmed
+                              ? 'bg-[#17261E] border border-[#22C55E]/40 text-[#22C55E]'
+                              : 'bg-[#A3E635] hover:bg-[#B4F72E] text-[#0A0F0D]'
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>{meal.confirmed ? 'Confirmada' : 'Confirmar'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditMeal(meal)}
+                          aria-label={`Editar ${meal.title}`}
+                          title="Editar refeição"
+                          className="p-2 rounded-lg bg-[#18201C] border border-white/8 text-[#9CA9A2] hover:text-white cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => onRemoveMeal(meal.id)}
+                          aria-label={`Remover ${meal.title}`}
+                          title="Excluir refeição"
+                          className="p-2 rounded-lg bg-[#18201C] border border-white/8 text-[#9CA9A2] hover:text-red-400 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Right 4 Columns: Hydration Grid & Supplements */}
@@ -485,7 +790,14 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => onAddWater(250)}
+                    onClick={() =>
+                      onSetWater(filled ? idx * 250 : (idx + 1) * 250)
+                    }
+                    title={
+                      filled
+                        ? `Reduzir para ${idx * 250} ml`
+                        : `Definir ${(idx + 1) * 250} ml`
+                    }
                     className={`h-10 rounded-lg border flex items-center justify-center text-xs font-mono transition-colors cursor-pointer ${
                       filled
                         ? 'bg-[#14B8A6]/20 border-[#14B8A6] text-[#14B8A6]'
@@ -498,35 +810,128 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
               })}
             </div>
 
-            <div className="flex items-center justify-between text-xs pt-1">
-              <span className="text-[#8C9992] tabular-nums">
-                {waterMl >= analysis.waterMl
-                  ? 'Meta diária atingida!'
-                  : `Restam ${analysis.waterMl - waterMl} ml`}
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={waterMl <= 0}
+                  onClick={() => onAddWater(-250)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#18201C] hover:bg-[#1F2A24] border border-white/10 text-xs font-semibold text-[#C8D3CD] disabled:opacity-40 cursor-pointer"
+                >
+                  <Minus className="w-3 h-3" />
+                  <span>250ml</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddWater(250)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#14B8A6]/15 hover:bg-[#14B8A6]/25 border border-[#14B8A6]/35 text-xs font-semibold text-[#14B8A6] cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>250ml</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddWater(500)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#14B8A6]/15 hover:bg-[#14B8A6]/25 border border-[#14B8A6]/35 text-xs font-semibold text-[#14B8A6] cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>500ml</span>
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => onAddWater(250)}
-                className="text-[#14B8A6] font-semibold hover:underline cursor-pointer"
+                disabled={waterMl === 0}
+                onClick={() => onSetWater(0)}
+                className="text-xs text-[#FCA5A5] font-semibold hover:underline disabled:opacity-40 cursor-pointer"
               >
-                + 250ml
+                Zerar água
               </button>
+            </div>
+
+            <form
+              onSubmit={handleApplyCustomWater}
+              className="flex items-center gap-2 pt-2 border-t border-white/6"
+            >
+              <input
+                type="number"
+                min={0}
+                max={15000}
+                step={50}
+                value={customWaterInput}
+                onChange={(e) => setCustomWaterInput(e.target.value)}
+                aria-label="Definir água exata em ml"
+                className="w-full h-8 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white font-mono tabular-nums focus:outline-none focus:border-[#14B8A6]"
+              />
+              <button
+                type="submit"
+                className="h-8 px-3 rounded-lg bg-[#18201C] hover:bg-[#222D27] border border-white/10 text-xs font-semibold text-white whitespace-nowrap cursor-pointer"
+              >
+                Definir ml
+              </button>
+            </form>
+
+            <div className="text-[11px] text-[#8C9992] tabular-nums">
+              {waterMl >= analysis.waterMl
+                ? 'Meta diária atingida!'
+                : `Restam ${Math.max(0, analysis.waterMl - waterMl)} ml`}
             </div>
           </div>
 
           <div className="apex-card p-6 space-y-4">
-            <h3 className="font-display text-base font-bold text-white">
-              Timing de Suplementos
-            </h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-display text-base font-bold text-white">
+                Timing de Suplementos
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddSupForm((v) => !v)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#A3E635] hover:underline cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Adicionar</span>
+              </button>
+            </div>
+
+            {showAddSupForm && (
+              <form onSubmit={handleCreateSupplement} className="space-y-2 apex-subcard p-3">
+                <input
+                  type="text"
+                  required
+                  value={supName}
+                  onChange={(e) => setSupName(e.target.value)}
+                  placeholder="Nome (ex.: Ômega 3)"
+                  className="w-full h-8 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={supDose}
+                    onChange={(e) => setSupDose(e.target.value)}
+                    placeholder="Dose/Horário (ex.: 2g Almoço)"
+                    className="w-full h-8 px-2.5 rounded-lg bg-[#0E1310] border border-white/10 text-xs text-white"
+                  />
+                  <button
+                    type="submit"
+                    className="h-8 px-3 rounded-lg bg-[#A3E635] text-[#0A0F0D] text-xs font-bold shrink-0 cursor-pointer"
+                  >
+                    Salvar
+                  </button>
+                </div>
+              </form>
+            )}
+
             <div className="space-y-2.5">
               {supplements.map((sup) => (
-                <button
+                <div
                   key={sup.id}
-                  type="button"
-                  onClick={() => onToggleSupplement(sup.id)}
-                  className="w-full p-3 rounded-xl bg-[#18201C] border border-white/6 hover:border-white/15 flex items-center justify-between gap-3 text-left cursor-pointer"
+                  className="w-full p-3 rounded-xl bg-[#18201C] border border-white/6 hover:border-white/15 flex items-center justify-between gap-2"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => onToggleSupplement(sup.id)}
+                    className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer"
+                  >
                     <span
                       className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border ${
                         sup.done
@@ -539,11 +944,21 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
                     <span className="text-xs font-medium text-white truncate">
                       {sup.name}
                     </span>
+                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] font-mono text-[#A3E635]">
+                      {sup.dose}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveSupplement(sup.id)}
+                      aria-label={`Remover ${sup.name}`}
+                      className="p-1 text-[#6B7871] hover:text-red-400 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <span className="text-[11px] font-mono text-[#A3E635] shrink-0">
-                    {sup.dose}
-                  </span>
-                </button>
+                </div>
               ))}
             </div>
           </div>

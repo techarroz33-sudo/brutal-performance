@@ -457,3 +457,89 @@ export async function deleteFoodAnalysisEntry(
     .eq('id', id);
   if (error) throw error;
 }
+
+export async function clearAllWorkoutLogs(userId: string): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('workout_exercise_logs')
+    .delete()
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function clearWeightEntries(userId: string): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('weight_entries')
+    .delete()
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function clearAllFoodAnalysisEntries(
+  userId: string
+): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('food_analysis_entries')
+    .delete()
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function exportAllUserData(userId: string) {
+  if (!supabase) return null;
+  const [
+    profileRes,
+    workoutsRes,
+    mealsRes,
+    wellnessRes,
+    weightsRes,
+    foodLogsRes,
+  ] = await Promise.all([
+    supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
+    supabase.from('workout_exercise_logs').select('*').eq('user_id', userId),
+    supabase.from('daily_meals').select('*').eq('user_id', userId),
+    supabase.from('daily_wellness_logs').select('*').eq('user_id', userId),
+    supabase.from('weight_entries').select('*').eq('user_id', userId),
+    supabase.from('food_analysis_entries').select('*').eq('user_id', userId),
+  ]);
+
+  if (profileRes.error) throw profileRes.error;
+  if (workoutsRes.error) throw workoutsRes.error;
+  if (mealsRes.error) throw mealsRes.error;
+  if (wellnessRes.error) throw wellnessRes.error;
+  if (weightsRes.error) throw weightsRes.error;
+  if (foodLogsRes.error) throw foodLogsRes.error;
+
+  return {
+    exportedAt: new Date().toISOString(),
+    app: 'Brutal Performance',
+    userProfile: profileRes.data,
+    workoutLogs: workoutsRes.data ?? [],
+    dailyMeals: mealsRes.data ?? [],
+    dailyWellnessLogs: wellnessRes.data ?? [],
+    weightEntries: weightsRes.data ?? [],
+    foodAnalysisEntries: foodLogsRes.data ?? [],
+  };
+}
+
+export async function deleteAllUserData(userId: string): Promise<void> {
+  if (!supabase) return;
+  const results = await Promise.all([
+    supabase.from('workout_exercise_logs').delete().eq('user_id', userId),
+    supabase.from('daily_meals').delete().eq('user_id', userId),
+    supabase.from('daily_wellness_logs').delete().eq('user_id', userId),
+    supabase.from('weight_entries').delete().eq('user_id', userId),
+    supabase.from('food_analysis_entries').delete().eq('user_id', userId),
+  ]);
+  for (const res of results) {
+    if (res.error) throw res.error;
+  }
+  const { error: profileError } = await supabase
+    .from('user_profiles')
+    .delete()
+    .eq('user_id', userId);
+  if (profileError) throw profileError;
+}
+

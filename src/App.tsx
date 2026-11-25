@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
+import { DataControlModal } from './components/DataControlModal';
 import { DashboardView } from './components/DashboardView';
 import { EvolutionView } from './components/EvolutionView';
 import { FoodAnalyzerView } from './components/FoodAnalyzerView';
@@ -14,15 +15,21 @@ import { TopBar } from './components/TopBar';
 import { WorkoutTableView } from './components/WorkoutTableView';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import {
+  clearAllFoodAnalysisEntries,
+  clearAllWorkoutLogs,
+  clearWeightEntries,
   clearWorkoutExerciseLogs,
+  deleteAllUserData,
   deleteDailyMeal,
   deleteFoodAnalysisEntry,
+  exportAllUserData,
   fetchDailyMeals,
   fetchDailyWellness,
   fetchFoodAnalysisEntries,
   fetchUserProfile,
   fetchWeightEntries,
   fetchWorkoutExerciseLogs,
+  getTodayIsoDate,
   insertWeightEntry,
   replaceDailyMeals,
   seedWeightEntries,
@@ -59,13 +66,13 @@ const DEFAULT_HABITS: DailyHabit[] = [
     id: 'hab-1',
     title: 'Creatina Monohidratada 5g',
     subtitle: 'Suporte de força e ressíntese de ATP',
-    completed: true,
+    completed: false,
   },
   {
     id: 'hab-2',
     title: 'Sono Reparador (7.5h – 8h)',
     subtitle: 'Recuperação neuromuscular e hormonal',
-    completed: true,
+    completed: false,
   },
   {
     id: 'hab-3',
@@ -82,8 +89,8 @@ const DEFAULT_HABITS: DailyHabit[] = [
 ];
 
 const DEFAULT_SUPPLEMENTS: DailySupplement[] = [
-  { id: 'sup-1', name: 'Creatina Monohidratada', dose: '5g (Manhã)', done: true },
-  { id: 'sup-2', name: 'Vitamina D3 + K2', dose: '2.000 UI', done: true },
+  { id: 'sup-1', name: 'Creatina Monohidratada', dose: '5g (Manhã)', done: false },
+  { id: 'sup-2', name: 'Vitamina D3 + K2', dose: '2.000 UI', done: false },
   { id: 'sup-3', name: 'Magnésio Bisglicinato', dose: '350mg (21:30)', done: false },
 ];
 
@@ -92,6 +99,8 @@ export default function App() {
   const [authChecking, setAuthChecking] = useState<boolean>(isSupabaseConfigured);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
   const [syncWarning, setSyncWarning] = useState<string>('');
+  const [activeDate, setActiveDate] = useState<string>(() => getTodayIsoDate());
+  const [dataControlOpen, setDataControlOpen] = useState<boolean>(false);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState<boolean>(false);
@@ -209,10 +218,7 @@ export default function App() {
         );
         setCompletedRestIds(remoteWellness.completedRestIds);
       } else {
-        const initialWater = Math.min(
-          1750,
-          Math.round(loadedAnalysis.waterMl * 0.55)
-        );
+        const initialWater = 0;
         setWaterMl(initialWater);
         setHabits(DEFAULT_HABITS);
         setSupplements(DEFAULT_SUPPLEMENTS);
@@ -295,6 +301,29 @@ export default function App() {
     };
   }, [hydrateUserFromSupabase, resetLocalSessionState]);
 
+  // Detecta mudança de dia (meia-noite ou retorno ao app em outro dia) e zera o Diário & Água automaticamente
+  useEffect(() => {
+    if (!authUser) return;
+
+    const checkDayRollover = () => {
+      const today = getTodayIsoDate();
+      if (today !== activeDate) {
+        setActiveDate(today);
+        void hydrateUserFromSupabase(authUser);
+      }
+    };
+
+    const intervalId = window.setInterval(checkDayRollover, 60_000);
+    window.addEventListener('focus', checkDayRollover);
+    document.addEventListener('visibilitychange', checkDayRollover);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', checkDayRollover);
+      document.removeEventListener('visibilitychange', checkDayRollover);
+    };
+  }, [activeDate, authUser, hydrateUserFromSupabase]);
+
   // Sincroniza a tabela de exercícios com os logs salvos no Supabase para o objetivo + ambiente ativo
   useEffect(() => {
     if (!workoutPlan) {
@@ -368,10 +397,7 @@ export default function App() {
 
     if (isFirstProfileSetup) {
       const seededMeals = generatePlannedMeals(normalizedProfile, newAnalysis);
-      const initialWater = Math.min(
-        1750,
-        Math.round(newAnalysis.waterMl * 0.55)
-      );
+      const initialWater = 0;
       const seededWeights = generateWeightHistory(
         normalizedProfile,
         newAnalysis
@@ -567,6 +593,28 @@ export default function App() {
     }
   };
 
+  const handleUpdateMeal = (updatedMeal: PlannedMeal) => {
+    setMeals((prev) =>
+      prev.map((m) => (m.id === updatedMeal.id ? updatedMeal : m))
+    );
+    if (authUser) {
+      void upsertDailyMeal(authUser.id, updatedMeal).catch((err) =>
+        console.error('Erro ao editar refeição:', err)
+      );
+    }
+  };
+
+  const handleRestoreDefaultMeals = () => {
+    if (!profile || !analysis) return;
+    const restored = generatePlannedMeals(profile, analysis);
+    setMeals(restored);
+    if (authUser) {
+      void replaceDailyMeals(authUser.id, restored).catch((err) =>
+        console.error('Erro ao restaurar refeições padrão:', err)
+      );
+    }
+  };
+
   const handleAddFoodToDay = (food: RecommendedFood) => {
     handleAddCustomMeal({
       time: new Date().toLocaleTimeString('pt-BR', {
@@ -585,16 +633,18 @@ export default function App() {
     });
   };
 
-  const handleAddWater = (amountMl: number) => {
-    const nextWater = waterMl + amountMl;
-    let nextHabits = habits;
-    if (analysis && nextWater >= analysis.waterMl) {
-      nextHabits = habits.map((item) =>
-        item.id === 'hab-3' ? { ...item, completed: true } : item
-      );
-      setHabits(nextHabits);
-    }
+  const handleSetWater = (exactMl: number) => {
+    const nextWater = Math.max(0, Math.min(15000, Math.round(exactMl)));
+    const nextHabits = analysis
+      ? habits.map((item) =>
+          item.id === 'hab-3'
+            ? { ...item, completed: nextWater >= analysis.waterMl }
+            : item
+        )
+      : habits;
+
     setWaterMl(nextWater);
+    setHabits(nextHabits);
 
     if (authUser) {
       void upsertDailyWellness(
@@ -605,6 +655,10 @@ export default function App() {
         completedRestIds
       ).catch((err) => console.error('Erro ao salvar hidratação:', err));
     }
+  };
+
+  const handleAddWater = (amountMl: number) => {
+    handleSetWater(waterMl + amountMl);
   };
 
   const handleToggleHabit = (habitId: string) => {
@@ -639,6 +693,122 @@ export default function App() {
         completedRestIds
       ).catch((err) => console.error('Erro ao salvar suplemento:', err));
     }
+  };
+
+  const handleAddSupplement = (name: string, dose: string) => {
+    const nextSupplements: DailySupplement[] = [
+      ...supplements,
+      { id: `sup-${Date.now()}`, name, dose, done: false },
+    ];
+    setSupplements(nextSupplements);
+
+    if (authUser) {
+      void upsertDailyWellness(
+        authUser.id,
+        waterMl,
+        habits,
+        nextSupplements,
+        completedRestIds
+      ).catch((err) => console.error('Erro ao adicionar suplemento:', err));
+    }
+  };
+
+  const handleRemoveSupplement = (supplementId: string) => {
+    const nextSupplements = supplements.filter((s) => s.id !== supplementId);
+    setSupplements(nextSupplements);
+
+    if (authUser) {
+      void upsertDailyWellness(
+        authUser.id,
+        waterMl,
+        habits,
+        nextSupplements,
+        completedRestIds
+      ).catch((err) => console.error('Erro ao remover suplemento:', err));
+    }
+  };
+
+  const handleResetTodayDiary = async () => {
+    const clearedMeals = meals.map((m) => ({ ...m, confirmed: false }));
+    const clearedSupplements = supplements.map((s) => ({ ...s, done: false }));
+    const clearedHabits = habits.map((h) => ({ ...h, completed: false }));
+
+    setMeals(clearedMeals);
+    setWaterMl(0);
+    setSupplements(clearedSupplements);
+    setHabits(clearedHabits);
+    setCompletedRestIds({});
+
+    if (authUser) {
+      await Promise.all([
+        replaceDailyMeals(authUser.id, clearedMeals),
+        upsertDailyWellness(
+          authUser.id,
+          0,
+          clearedHabits,
+          clearedSupplements,
+          {}
+        ),
+      ]);
+    }
+  };
+
+  const handleExportAllData = async () => {
+    if (!authUser) return;
+    const payload = await exportAllUserData(authUser.id);
+    if (!payload) return;
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `brutal-performance-dados-${getTodayIsoDate()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleResetAllWorkouts = async () => {
+    if (workoutPlan) {
+      setExercises(workoutPlan.exercises);
+    }
+    if (authUser) {
+      await clearAllWorkoutLogs(authUser.id);
+    }
+  };
+
+  const handleClearFoodAnalyses = async () => {
+    setFoodAnalysisEntries([]);
+    if (authUser) {
+      await clearAllFoodAnalysisEntries(authUser.id);
+    }
+  };
+
+  const handleResetWeightHistory = async () => {
+    if (!profile || !analysis) return;
+    const currentEntry: WeightEntry = {
+      label: new Date().toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+      }),
+      weightKg: profile.weightKg,
+      volumeKg: Math.round(profile.weightKg * 420),
+      bfPercent: analysis.estimatedBfPercent,
+    };
+    setWeightHistory([currentEntry]);
+    if (authUser) {
+      await clearWeightEntries(authUser.id);
+      await insertWeightEntry(authUser.id, currentEntry, profile.waistCm);
+    }
+  };
+
+  const handleDeleteAllData = async () => {
+    if (!authUser) return;
+    await deleteAllUserData(authUser.id);
+    setDataControlOpen(false);
+    resetLocalSessionState();
   };
 
   const handleToggleRestActivity = (activityId: string) => {
@@ -833,6 +1003,7 @@ export default function App() {
           onChangeGoal={handleChangeGoal}
           onLogout={handleLogout}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          onOpenDataControl={() => setDataControlOpen(true)}
         />
 
         <main className="flex-1 px-4 py-6 lg:px-8 lg:py-7 max-w-[1440px] w-full mx-auto space-y-4">
@@ -917,15 +1088,23 @@ export default function App() {
             <NutritionView
               profile={profile}
               analysis={analysis}
+              activeDateLabel={activeDate.split('-').reverse().join('/')}
               meals={meals}
               onToggleMeal={handleToggleMeal}
               onAddCustomMeal={handleAddCustomMeal}
+              onUpdateMeal={handleUpdateMeal}
               onRemoveMeal={handleRemoveMeal}
+              onRestoreDefaultMeals={handleRestoreDefaultMeals}
               waterMl={waterMl}
               onAddWater={handleAddWater}
+              onSetWater={handleSetWater}
               supplements={supplements}
               onToggleSupplement={handleToggleSupplement}
+              onAddSupplement={handleAddSupplement}
+              onRemoveSupplement={handleRemoveSupplement}
+              onResetTodayDiary={() => void handleResetTodayDiary()}
               onNavigateTab={setActiveTab}
+              onOpenDataControl={() => setDataControlOpen(true)}
             />
           )}
 
@@ -939,6 +1118,23 @@ export default function App() {
           )}
         </main>
       </div>
+
+      <DataControlModal
+        open={dataControlOpen}
+        onClose={() => setDataControlOpen(false)}
+        profile={profile}
+        mealsConfirmedCount={meals.filter((m) => m.confirmed).length}
+        waterMl={waterMl}
+        foodAnalysisCount={foodAnalysisEntries.length}
+        weightEntriesCount={weightHistory.length}
+        onEditProfile={() => setIsEditingProfile(true)}
+        onExportData={handleExportAllData}
+        onResetTodayDiary={handleResetTodayDiary}
+        onResetAllWorkouts={handleResetAllWorkouts}
+        onClearFoodAnalyses={handleClearFoodAnalyses}
+        onResetWeightHistory={handleResetWeightHistory}
+        onDeleteAllData={handleDeleteAllData}
+      />
     </div>
   );
 }

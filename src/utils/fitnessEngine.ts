@@ -1949,7 +1949,7 @@ export function generatePlannedMeals(
         fatG: scale(18),
         fiberG: 7,
         tag: 'Café Matinal',
-        confirmed: true,
+        confirmed: false,
       },
       {
         id: 'meal-2',
@@ -1964,7 +1964,7 @@ export function generatePlannedMeals(
         fatG: scale(16),
         fiberG: 10,
         tag: 'Janela Anabólica',
-        confirmed: true,
+        confirmed: false,
       },
       {
         id: 'meal-3',
@@ -2014,7 +2014,7 @@ export function generatePlannedMeals(
         fatG: scale(12),
         fiberG: 8,
         tag: 'Baixo Índice Glicêmico',
-        confirmed: true,
+        confirmed: false,
       },
       {
         id: 'meal-2',
@@ -2029,7 +2029,7 @@ export function generatePlannedMeals(
         fatG: scale(11),
         fiberG: 12,
         tag: 'Alta Saciedade',
-        confirmed: true,
+        confirmed: false,
       },
       {
         id: 'meal-3',
@@ -2079,7 +2079,7 @@ export function generatePlannedMeals(
       fatG: scale(16),
       fiberG: 7,
       tag: 'Energia Estável',
-      confirmed: true,
+      confirmed: false,
     },
     {
       id: 'meal-2',
@@ -2094,7 +2094,7 @@ export function generatePlannedMeals(
       fatG: scale(18),
       fiberG: 11,
       tag: 'Micronutrientes',
-      confirmed: true,
+      confirmed: false,
     },
     {
       id: 'meal-3',

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { LogOut, Menu } from 'lucide-react';
+import { Database, LogOut, Menu } from 'lucide-react';
 import { AppTab, FitnessGoal, UserProfile } from '../types';
 import { GOAL_LABELS } from '../utils/fitnessEngine';
 
@@ -11,6 +11,7 @@ interface TopBarProps {
   onChangeGoal: (goal: FitnessGoal) => void;
   onLogout: () => void;
   onOpenMobileMenu: () => void;
+  onOpenDataControl: () => void;
 }
 
 const TAB_TITLES: Record<AppTab, string> = {
@@ -30,6 +31,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onChangeGoal,
   onLogout,
   onOpenMobileMenu,
+  onOpenDataControl,
 }) => {
   return (
     <header className="h-16 border-b border-white/8 bg-[#0E1310]/95 backdrop-blur-md px-4 lg:px-8 flex items-center justify-between gap-3 sticky top-0 z-30">
@@ -83,14 +85,26 @@ export const TopBar: React.FC<TopBarProps> = ({
         </select>
       </div>
 
-      <button
-        type="button"
-        onClick={onLogout}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#151D19] hover:bg-[#1D2722] border border-white/10 text-xs font-medium text-[#C8D3CD] hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-      >
-        <LogOut className="w-3.5 h-3.5 text-[#9CA9A2]" />
-        <span className="hidden sm:inline">Sair</span>
-      </button>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={onOpenDataControl}
+          title="Controlar, exportar ou limpar meus dados"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#151D19] hover:bg-[#1D2722] border border-white/10 text-xs font-medium text-[#C8D3CD] hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+        >
+          <Database className="w-3.5 h-3.5 text-[#A3E635]" />
+          <span className="hidden sm:inline">Meus Dados</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onLogout}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#151D19] hover:bg-[#1D2722] border border-white/10 text-xs font-medium text-[#C8D3CD] hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+        >
+          <LogOut className="w-3.5 h-3.5 text-[#9CA9A2]" />
+          <span className="hidden sm:inline">Sair</span>
+        </button>
+      </div>
     </header>
   );
 };
