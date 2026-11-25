@@ -215,7 +215,16 @@ function buildSets(
   });
 }
 
-type RawExerciseDef = Omit<ExerciseItem, 'sets' | 'suggestedLoadKg'> & {
+export function buildExerciseYoutubeUrl(exerciseName: string): string {
+  const cleaned = exerciseName
+    .replace(/[()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const query = `como fazer ${cleaned} execução correta`;
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+}
+
+type RawExerciseDef = Omit<ExerciseItem, 'sets' | 'suggestedLoadKg' | 'youtubeUrl'> & {
   loadFactor: number;
   rpeNum: number;
   homeName?: string;
@@ -388,15 +397,17 @@ export function generateWorkoutPlan(
     rawExercises.map(
       ({ loadFactor, rpeNum, homeName, homeEquipment, homeLoadFactor, homeTechniqueNote, ...rest }) => {
         const useHome = environment === 'casa' && Boolean(homeName);
+        const resolvedName = useHome ? homeName! : rest.name;
         const effectiveFactor = useHome ? (homeLoadFactor ?? 0) : loadFactor;
         const suggestedLoadKg = effectiveFactor === 0 ? 0 : scaleLoad(effectiveFactor, profile);
         return {
           ...rest,
-          name: useHome ? homeName! : rest.name,
+          name: resolvedName,
           equipment: useHome ? (homeEquipment ?? 'Peso Corporal') : rest.equipment,
           techniqueNote: useHome && homeTechniqueNote ? homeTechniqueNote : rest.techniqueNote,
           alternativeName: useHome ? rest.name : homeName ?? rest.alternativeName,
           suggestedLoadKg,
+          youtubeUrl: buildExerciseYoutubeUrl(resolvedName),
           sets: buildSets(rest.setsCount, rest.repsRange, suggestedLoadKg, rpeNum),
         };
       }

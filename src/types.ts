@@ -85,6 +85,7 @@ export interface ExerciseItem {
   tempo: string;
   suggestedLoadKg: number;
   techniqueNote: string;
+  youtubeUrl: string;
   sets: ExerciseSetLog[];
 }
 
