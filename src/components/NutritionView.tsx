@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import {
   Apple,
@@ -10,6 +12,7 @@ import {
 import {
   AppTab,
   BiometricAnalysis,
+  DailySupplement,
   PlannedMeal,
   UserProfile,
 } from '../types';
@@ -24,6 +27,8 @@ interface NutritionViewProps {
   onRemoveMeal: (mealId: string) => void;
   waterMl: number;
   onAddWater: (amountMl: number) => void;
+  supplements: DailySupplement[];
+  onToggleSupplement: (supplementId: string) => void;
   onNavigateTab: (tab: AppTab) => void;
 }
 
@@ -36,6 +41,8 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
   onRemoveMeal,
   waterMl,
   onAddWater,
+  supplements,
+  onToggleSupplement,
   onNavigateTab,
 }) => {
   const [showAddForm, setShowAddForm] = useState(false);
@@ -45,12 +52,6 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
   const [proteinG, setProteinG] = useState(28);
   const [carbsG, setCarbsG] = useState(32);
   const [fatG, setFatG] = useState(8);
-
-  const [supplements, setSupplements] = useState([
-    { id: 'sup-1', name: 'Creatina Monohidratada', dose: '5g (Manhã)', done: true },
-    { id: 'sup-2', name: 'Vitamina D3 + K2', dose: '2.000 UI', done: true },
-    { id: 'sup-3', name: 'Magnésio Bisglicinato', dose: '350mg (21:30)', done: false },
-  ]);
 
   const consumedKcal = meals
     .filter((m) => m.confirmed)
@@ -522,13 +523,7 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
                 <button
                   key={sup.id}
                   type="button"
-                  onClick={() =>
-                    setSupplements((prev) =>
-                      prev.map((s) =>
-                        s.id === sup.id ? { ...s, done: !s.done } : s
-                      )
-                    )
-                  }
+                  onClick={() => onToggleSupplement(sup.id)}
                   className="w-full p-3 rounded-xl bg-[#18201C] border border-white/6 hover:border-white/15 flex items-center justify-between gap-3 text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-3 min-w-0">

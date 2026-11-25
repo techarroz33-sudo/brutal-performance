@@ -173,6 +173,13 @@ export interface DailyHabit {
   completed: boolean;
 }
 
+export interface DailySupplement {
+  id: string;
+  name: string;
+  dose: string;
+  done: boolean;
+}
+
 export interface WeightEntry {
   label: string;
   weightKg: number;

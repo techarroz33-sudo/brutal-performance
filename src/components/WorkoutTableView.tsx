@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
@@ -42,6 +44,8 @@ interface WorkoutTableViewProps {
     value: number
   ) => void;
   onResetWorkoutProgress: () => void;
+  completedRestIds: Record<string, boolean>;
+  onToggleRestActivity: (activityId: string) => void;
 }
 
 export const WorkoutTableView: React.FC<WorkoutTableViewProps> = ({
@@ -57,10 +61,11 @@ export const WorkoutTableView: React.FC<WorkoutTableViewProps> = ({
   onToggleSetDone,
   onUpdateSetField,
   onResetWorkoutProgress,
+  completedRestIds,
+  onToggleRestActivity,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
-  const [completedRestIds, setCompletedRestIds] = useState<Record<string, boolean>>({});
 
   // Rest timer state (seconds)
   const [timerSeconds, setTimerSeconds] = useState<number>(60);
@@ -353,12 +358,7 @@ export const WorkoutTableView: React.FC<WorkoutTableViewProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        setCompletedRestIds((prev) => ({
-                          ...prev,
-                          [act.id]: !prev[act.id],
-                        }))
-                      }
+                      onClick={() => onToggleRestActivity(act.id)}
                       className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer ${
                         done
                           ? 'bg-[#22C55E] text-[#0A0F0D]'

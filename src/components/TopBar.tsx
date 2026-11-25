@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { LogOut, Menu } from 'lucide-react';
 import { AppTab, FitnessGoal, UserProfile } from '../types';
@@ -87,7 +89,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#151D19] hover:bg-[#1D2722] border border-white/10 text-xs font-medium text-[#C8D3CD] hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
       >
         <LogOut className="w-3.5 h-3.5 text-[#9CA9A2]" />
-        <span className="hidden sm:inline">Trocar Perfil</span>
+        <span className="hidden sm:inline">Sair</span>
       </button>
     </header>
   );
